@@ -8,7 +8,7 @@ fn current_time_8601() -> String {
     format!("{}", dt.format("%Y%m%d%H%M%S"))
 }
 
-async fn fetch_puzzle(url: String, name: String) -> Option<String> {
+async fn download_puzzle(url: String, name: String) -> Option<String> {
     let response = reqwest::get(url).await;
     if response.is_err() {
         return Some(format!(
@@ -54,6 +54,75 @@ async fn fetch_puzzle(url: String, name: String) -> Option<String> {
         return Some(format!("File sync unwrap: {}", fs.unwrap_err().to_string()));
     }
     None
+}
+
+async fn download_url(url: String, name: String) -> Option<String> {
+    let response = reqwest::get(url).await;
+    if response.is_err() {
+        return Some(format!(
+            "First unwrap: {}",
+            response.unwrap_err().to_string()
+        ));
+    }
+    let tex2 = response.unwrap().text().await;
+    if tex2.is_err() {
+        return Some(format!("Second unwrap: {}", tex2.unwrap_err().to_string()));
+    }
+    let tex = tex2.unwrap();
+    let fx = File::create_new(format!("data/{}_{}", current_time_8601(), name));
+    if fx.is_err() {
+        return Some(format!(
+            "File creation unwrap: {}",
+            fx.unwrap_err().to_string()
+        ));
+    }
+    let mut f = fx.unwrap();
+    let fw = f.write_all(tex.as_bytes());
+    if fw.is_err() {
+        return Some(format!(
+            "File write unwrap: {}",
+            fw.unwrap_err().to_string()
+        ));
+    }
+    fw.unwrap();
+
+    let fs = f.sync_all();
+    if fs.is_err() {
+        return Some(format!("File sync unwrap: {}", fs.unwrap_err().to_string()));
+    }
+    None
+}
+
+async fn download_nyt() -> Option<String> {
+    let st = std::time::SystemTime::now();
+    let dt: DateTime<Utc> = st.into();
+    let connections_url = format!(
+        "https://nytimes.com/svc/connections/v1/{}.json",
+        dt.format("%Y-%m-%d")
+    );
+    let pips_url = format!(
+        "https://nytimes.com/svc/pips/v1/{}.json",
+        dt.format("%Y-%m-%d")
+    );
+
+    let connections_ret = download_url(connections_url, "Connections".to_string())
+        .await
+        .map(|x| x + " in Connections");
+    if connections_ret.is_some() {
+        return connections_ret;
+    }
+    let pips_ret = download_url(pips_url, "Pips".to_string())
+        .await
+        .map(|x| x + " in Pips");
+    if pips_ret.is_some() {
+        return pips_ret;
+    }
+    let mini_ret = download_url(
+        "https://www.nytimes.com/svc/crosswords/v6/puzzle/mini.json".to_string(),
+        "Mini".to_string(),
+    )
+    .await;
+    mini_ret.map(|x| x + " in mini")
 }
 
 #[tokio::main]
@@ -421,7 +490,9 @@ async fn main() {
     }
 
     for puzzle in puzzles {
-        fetch_puzzle(puzzle.0.to_string(), puzzle.1.to_string()).await;
+        download_puzzle(puzzle.0.to_string(), puzzle.1.to_string()).await;
         println!("Completed {}", puzzle.1.to_string());
     }
+    download_nyt().await;
+    println!("Completed NYT");
 }
