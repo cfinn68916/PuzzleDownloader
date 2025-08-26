@@ -490,9 +490,19 @@ async fn main() {
     }
 
     for puzzle in puzzles {
-        download_puzzle(puzzle.0.to_string(), puzzle.1.to_string()).await;
-        println!("Completed {}", puzzle.1.to_string());
+        let ret = download_puzzle(puzzle.0.to_string(), puzzle.1.to_string()).await;
+        if ret.is_some() {
+            println!("Error during {}:", puzzle.1);
+            println!("{}", ret.unwrap());
+        } else {
+            println!("Completed {}", puzzle.1);
+        }
     }
-    download_nyt().await;
-    println!("Completed NYT");
+    let ret = download_nyt().await;
+    if ret.is_some() {
+        println!("Error during NYT:");
+        println!("{}", ret.unwrap());
+    } else {
+        println!("Completed NYT");
+    }
 }
