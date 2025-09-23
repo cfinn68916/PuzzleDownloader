@@ -1,7 +1,7 @@
 use std::fs::File;
-use std::io::Write;
+use std::io::{Read, Write};
 
-async fn fetch_puzzle(url: String) -> Result<String,String> {
+async fn fetch_puzzle(url: String) -> Result<String, String> {
     let response = reqwest::get(url).await;
     if response.is_err() {
         return Err(format!(
@@ -30,25 +30,41 @@ async fn fetch_puzzle(url: String) -> Result<String,String> {
 
 #[tokio::main]
 async fn main() {
-    let mut puzzles=vec![];
-    let mut ident=0;
-    let mut f=File::create_new("kakurasu").unwrap();
-    while ident<100 {
-        let p=fetch_puzzle("https://www.puzzle-kakurasu.com/".to_string()).await;
+    let mut puzzles = vec![];
+    let mut ident = 0;
+    if std::fs::exists("kakurasu").ok().unwrap_or(false) {
+        let mut f = File::open("kakurasu").unwrap();
+        let mut contents = String::new();
+        f.read_to_string(&mut contents).unwrap();
+        puzzles = contents
+            .split("\n")
+            .filter_map(|x| {
+                if x.is_empty() {
+                    None
+                } else {
+                    Some(x.to_string())
+                }
+            })
+            .collect();
+        std::fs::remove_file("kakurasu").unwrap();
+    }
+    let mut f = File::create_new("kakurasu").unwrap();
+    while ident < 100 {
+        let p = fetch_puzzle("https://www.puzzle-kakurasu.com/".to_string()).await;
         if p.is_ok() {
-            let up=p.unwrap();
+            let up = p.unwrap();
             if !puzzles.contains(&up) {
                 puzzles.push(up.clone());
                 f.write_all(up.as_bytes()).unwrap();
                 f.write_all("\n".as_bytes()).unwrap();
-                ident=0;
-            }else{
-                ident=ident+1;
+                ident = 0;
+            } else {
+                ident = ident + 1;
             }
-        }else{
+        } else {
             println!("{}", p.unwrap_err());
         }
-        println!("{}",puzzles.len());
+        println!("{}", puzzles.len());
     }
     f.sync_all().unwrap();
 }
