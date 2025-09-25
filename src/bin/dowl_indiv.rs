@@ -49,6 +49,10 @@ async fn main() {
         std::fs::remove_file("kakurasu").unwrap();
     }
     let mut f = File::create_new("kakurasu").unwrap();
+    puzzles.iter().for_each(|x|{
+        f.write_all(x.as_bytes()).unwrap();
+        f.write_all("\n".as_bytes()).unwrap();
+    });
     while ident < 100 {
         let p = fetch_puzzle("https://www.puzzle-kakurasu.com/".to_string()).await;
         if p.is_ok() {
